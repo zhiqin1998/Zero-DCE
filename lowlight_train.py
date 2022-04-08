@@ -67,8 +67,7 @@ def train(config):
 
             if ((iteration + 1) % config.display_iter) == 0:
                 print("Loss at iteration", iteration + 1, ":", loss.item())
-            if ((iteration + 1) % config.snapshot_iter) == 0:
-                torch.save(DCE_net.state_dict(), config.snapshots_folder + "Epoch" + str(epoch) + '.pth')
+        torch.save(DCE_net.state_dict(), config.snapshots_folder + "Epoch" + str(epoch) + '.pth')
 
 
 if __name__ == "__main__":
