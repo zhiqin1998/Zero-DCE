@@ -21,9 +21,9 @@ def populate_train_list(lowlight_images_path):
 
 class lowlight_loader(data.Dataset):
 
-    def __init__(self, lowlight_images_path, preload=False):
+    def __init__(self, lowlight_images_path, size=256, preload=False):
         self.train_list = populate_train_list(lowlight_images_path)
-        self.size = 256
+        self.size = size
         self.preload = preload
 
         self.data_list = self.train_list
@@ -37,11 +37,12 @@ class lowlight_loader(data.Dataset):
                 data_lowlight = data_lowlight.resize((self.size, self.size), Image.ANTIALIAS)
 
                 data_lowlight = (np.asarray(data_lowlight) / 255.0)
-                self.data_list.append(data_lowlight)
+                data_lowlight = torch.from_numpy(data_lowlight).float()
+                self.data_list.append(data_lowlight.permute(2, 0, 1))
 
     def __getitem__(self, index):
         if self.preload:
-            data_lowlight = torch.from_numpy(self.data_list[index]).float()
+            return self.data_list[index]
         else:
             data_lowlight_path = self.data_list[index]
 
@@ -52,7 +53,7 @@ class lowlight_loader(data.Dataset):
             data_lowlight = (np.asarray(data_lowlight) / 255.0)
             data_lowlight = torch.from_numpy(data_lowlight).float()
 
-        return data_lowlight.permute(2, 0, 1)
+            return data_lowlight.permute(2, 0, 1)
 
     def __len__(self):
         return len(self.data_list)

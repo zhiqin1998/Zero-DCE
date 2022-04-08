@@ -26,7 +26,7 @@ def train(config):
     DCE_net.apply(weights_init)
     if config.load_pretrain == True:
         DCE_net.load_state_dict(torch.load(config.pretrain_dir))
-    train_dataset = dataloader.lowlight_loader(config.lowlight_images_path, preload=True)
+    train_dataset = dataloader.lowlight_loader(config.lowlight_images_path, size=config.image_size, preload=True)
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=config.train_batch_size, shuffle=True,
                                                num_workers=config.num_workers, pin_memory=True)
@@ -89,6 +89,7 @@ if __name__ == "__main__":
     parser.add_argument('--load_pretrain', type=bool, default=False)
     parser.add_argument('--pretrain_dir', type=str, default="snapshots/Epoch99.pth")
     parser.add_argument('--exposure', type=float, default=0.6)
+    parser.add_argument('--image_size', type=int, default=256)
 
     config = parser.parse_args()
 
