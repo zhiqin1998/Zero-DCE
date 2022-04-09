@@ -1,3 +1,4 @@
+import random
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -78,14 +79,18 @@ class L_exp(nn.Module):
         super(L_exp, self).__init__()
         # print(1)
         self.pool = nn.AvgPool2d(patch_size)
+        if mean_val < 0:
+            print('set random exposure for darkening')
         self.mean_val = mean_val
 
     def forward(self, x):
         b, c, h, w = x.shape
         x = torch.mean(x, 1, keepdim=True)
         mean = self.pool(x)
-
-        d = torch.mean(torch.pow(mean - torch.FloatTensor([self.mean_val]).cuda(), 2))
+        mean_val = self.mean_val
+        if mean_val < 0:
+            mean_val = random.gauss(0.3, 0.1/3)
+        d = torch.mean(torch.pow(mean - torch.FloatTensor([mean_val]).cuda(), 2))
         return d
 
 
