@@ -21,7 +21,7 @@ def weights_init(m):
 def train(config):
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
-    DCE_net = model.enhance_net_nopool_n16().cuda()
+    DCE_net = model.enhance_net_nopool().cuda()
 
     DCE_net.apply(weights_init)
     if config.load_pretrain == True:

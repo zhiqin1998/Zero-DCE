@@ -18,7 +18,7 @@ class L_color(nn.Module):
         Drg = torch.pow(mr - mg, 2)
         Drb = torch.pow(mr - mb, 2)
         Dgb = torch.pow(mb - mg, 2)
-        k = torch.pow(torch.pow(Drg, 2) + torch.pow(Drb, 2) + torch.pow(Dgb, 2) + 1e-8, 0.5)
+        k = torch.pow(torch.pow(Drg, 2) + torch.pow(Drb, 2) + torch.pow(Dgb, 2) + 1e-16, 0.5)
 
         return k
 
