@@ -18,6 +18,11 @@ def weights_init(m):
         m.bias.data.fill_(0)
 
 
+def nanmean(v):
+    is_nan = torch.isnan(v)
+    v[is_nan] = 0
+    return v.sum() / (~is_nan).float().sum()
+
 def train(config):
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
@@ -32,7 +37,7 @@ def train(config):
                                                num_workers=config.num_workers, pin_memory=True)
 
     L_color = Myloss.L_color()
-    L_spa = Myloss.L_spa()
+    L_spa = Myloss.L_spa(clip=0.01)
 
     L_exp = Myloss.L_exp(16, config.exposure)
     L_TV = Myloss.L_TV()
@@ -50,15 +55,19 @@ def train(config):
 
             Loss_TV = 200 * L_TV(A)
 
-            loss_spa = torch.mean(L_spa(enhanced_image, img_lowlight))
+            loss_spa = torch.mean(L_spa(img_lowlight, enhanced_image))
 
             loss_col = 5 * torch.mean(L_color(enhanced_image))
+            # loss_col = 5 * nanmean(L_color(enhanced_image))
+            # if torch.isnan(loss_col).any().item():
+            #     print('warning color loss is all nan')
+            #     loss_col = 0
 
             loss_exp = 10 * torch.mean(L_exp(enhanced_image))
 
             # best_loss
             loss = Loss_TV + loss_spa + loss_col + loss_exp
-            #
+            # loss = Loss_TV + loss_col + loss_exp
 
             optimizer.zero_grad()
             loss.backward()

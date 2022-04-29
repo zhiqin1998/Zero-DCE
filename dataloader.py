@@ -8,11 +8,14 @@ from PIL import Image
 
 random.seed(1143)
 
+def populate_train_list(lowlight_images_paths):
+    train_list = []
 
-def populate_train_list(lowlight_images_path):
-    image_list_lowlight = glob.glob(lowlight_images_path + "*.jpg")
+    for lowlight_images_path in lowlight_images_paths.split(','):
+        lowlight_images_path = lowlight_images_path.strip()
+        image_list_lowlight = glob.glob(lowlight_images_path + "*.jpg")
 
-    train_list = image_list_lowlight
+        train_list += image_list_lowlight
 
     random.shuffle(train_list)
 

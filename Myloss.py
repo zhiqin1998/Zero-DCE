@@ -18,14 +18,16 @@ class L_color(nn.Module):
         Drg = torch.pow(mr - mg, 2)
         Drb = torch.pow(mr - mb, 2)
         Dgb = torch.pow(mb - mg, 2)
-        k = torch.pow(torch.pow(Drg, 2) + torch.pow(Drb, 2) + torch.pow(Dgb, 2) + 1e-16, 0.5)
+        k = torch.pow(torch.pow(Drg, 2) + torch.pow(Drb, 2) + torch.pow(Dgb, 2), 0.5)
+        # avoid sqrt 0
+        # k = Drg + Drb + Dgb
 
         return k
 
 
 class L_spa(nn.Module):
 
-    def __init__(self):
+    def __init__(self, clip=1.):
         super(L_spa, self).__init__()
         # print(1)kernel = torch.FloatTensor(kernel).unsqueeze(0).unsqueeze(0)
         kernel_left = torch.FloatTensor([[0, 0, 0], [-1, 1, 0], [0, 0, 0]]).cuda().unsqueeze(0).unsqueeze(0)
@@ -37,6 +39,7 @@ class L_spa(nn.Module):
         self.weight_up = nn.Parameter(data=kernel_up, requires_grad=False)
         self.weight_down = nn.Parameter(data=kernel_down, requires_grad=False)
         self.pool = nn.AvgPool2d(4)
+        self.clip = (-clip, clip)
 
     def forward(self, org, enhance):
         b, c, h, w = org.shape
@@ -44,8 +47,17 @@ class L_spa(nn.Module):
         org_mean = torch.mean(org, 1, keepdim=True)
         enhance_mean = torch.mean(enhance, 1, keepdim=True)
 
+        # reduce std of input img
+        org_mean_m = torch.mean(org_mean, [2, 3], keepdim=True)
+        org_mean_s = torch.std(org_mean, [2, 3], keepdim=True)
+
+        org_mean = (org_mean - org_mean_m) / org_mean_s
+        org_mean = org_mean * torch.min(torch.max(org_mean_s / 5, torch.full(org_mean_s.shape, 0.005).cuda()), org_mean_s) + org_mean_m
+
         org_pool = self.pool(org_mean)
         enhance_pool = self.pool(enhance_mean)
+        # org_pool = org_mean
+        # enhance_pool = enhance_mean
 
         weight_diff = torch.max(
             torch.FloatTensor([1]).cuda() + 10000 * torch.min(org_pool - torch.FloatTensor([0.3]).cuda(),
@@ -57,6 +69,17 @@ class L_spa(nn.Module):
         D_org_right = F.conv2d(org_pool, self.weight_right, padding=1)
         D_org_up = F.conv2d(org_pool, self.weight_up, padding=1)
         D_org_down = F.conv2d(org_pool, self.weight_down, padding=1)
+
+        # clamp spatial diff
+        # D_org_letf = torch.clamp(D_org_letf, self.clip[0], self.clip[1])
+        # D_org_right = torch.clamp(D_org_right, self.clip[0], self.clip[1])
+        # D_org_up = torch.clamp(D_org_up, self.clip[0], self.clip[1])
+        # D_org_down = torch.clamp(D_org_down, self.clip[0], self.clip[1])
+        # D_org_letf = D_org_letf / 2.
+        # D_org_right = D_org_right / 2.
+        # D_org_up = D_org_up / 2.
+        # D_org_down = D_org_down / 2.
+
 
         D_enhance_letf = F.conv2d(enhance_pool, self.weight_left, padding=1)
         D_enhance_right = F.conv2d(enhance_pool, self.weight_right, padding=1)
@@ -88,6 +111,7 @@ class L_exp(nn.Module):
         x = torch.mean(x, 1, keepdim=True)
         mean = self.pool(x)
         mean_val = self.mean_val
+        # random exposure value
         if mean_val < 0:
             mean_val = random.gauss(0.3, 0.1/3)
         d = torch.mean(torch.pow(mean - torch.FloatTensor([mean_val]).cuda(), 2))
