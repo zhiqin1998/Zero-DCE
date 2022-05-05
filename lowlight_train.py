@@ -38,6 +38,7 @@ def train(config):
 
     L_color = Myloss.L_color()
     L_spa = Myloss.L_spa(clip=0.01)
+    L_std = Myloss.L_std()
 
     L_exp = Myloss.L_exp(16, config.exposure)
     L_TV = Myloss.L_TV()
@@ -56,6 +57,7 @@ def train(config):
             Loss_TV = 200 * L_TV(A)
 
             loss_spa = torch.mean(L_spa(img_lowlight, enhanced_image))
+            loss_std = torch.mean(L_std(img_lowlight, enhanced_image))
 
             loss_col = 5 * torch.mean(L_color(enhanced_image))
             # loss_col = 5 * nanmean(L_color(enhanced_image))
@@ -66,7 +68,7 @@ def train(config):
             loss_exp = 10 * torch.mean(L_exp(enhanced_image))
 
             # best_loss
-            loss = Loss_TV + loss_spa + loss_col + loss_exp
+            loss = Loss_TV + loss_spa + loss_col + loss_exp + loss_std
             # loss = Loss_TV + loss_col + loss_exp
 
             optimizer.zero_grad()

@@ -5,6 +5,24 @@ import torch.nn.functional as F
 from torchvision.models.vgg import vgg16
 
 
+
+class L_std(nn.Module):
+
+    def __init__(self):
+        super(L_std, self).__init__()
+
+    def forward(self, org, enhance):
+
+        org_mean = torch.mean(org, 1, keepdim=True)
+        enhance_mean = torch.mean(enhance, 1, keepdim=True)
+
+        org_std = torch.std(org_mean, [2, 3])
+        enhance_std = torch.std(enhance_mean, [2, 3])
+
+        s = torch.pow(enhance_std - torch.max(org_std / 5, torch.full(org_std.shape, 0.005).cuda()), 2)
+
+        return s
+
 class L_color(nn.Module):
 
     def __init__(self):
@@ -48,11 +66,11 @@ class L_spa(nn.Module):
         enhance_mean = torch.mean(enhance, 1, keepdim=True)
 
         # reduce std of input img
-        org_mean_m = torch.mean(org_mean, [2, 3], keepdim=True)
-        org_mean_s = torch.std(org_mean, [2, 3], keepdim=True)
-
-        org_mean = (org_mean - org_mean_m) / org_mean_s
-        org_mean = org_mean * torch.min(torch.max(org_mean_s / 5, torch.full(org_mean_s.shape, 0.005).cuda()), org_mean_s) + org_mean_m
+        # org_mean_m = torch.mean(org_mean, [2, 3], keepdim=True)
+        # org_mean_s = torch.std(org_mean, [2, 3], keepdim=True)
+        #
+        # org_mean = (org_mean - org_mean_m) / org_mean_s
+        # org_mean = org_mean * torch.min(torch.max(org_mean_s / 5, torch.full(org_mean_s.shape, 0.005).cuda()), org_mean_s) + org_mean_m
 
         org_pool = self.pool(org_mean)
         enhance_pool = self.pool(enhance_mean)
