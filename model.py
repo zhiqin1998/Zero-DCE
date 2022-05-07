@@ -59,8 +59,7 @@ class enhance_net_nopool_con(nn.Module):
         self.relu = nn.ReLU(inplace=True)
 
         number_f = 32
-        self.con_conv1 = nn.Conv2d(3, number_f, 3, 1, 1, bias=True)
-        self.con_conv2 = nn.Conv2d(number_f, 3, 3, 1, 1, bias=True)
+        self.con_conv1 = nn.Conv2d(3, 3, 3, 1, 1, bias=True)
         self.e_conv1 = nn.Conv2d(3, number_f, 3, 1, 1, bias=True)
         self.e_conv2 = nn.Conv2d(number_f, number_f, 3, 1, 1, bias=True)
         self.e_conv3 = nn.Conv2d(number_f, number_f, 3, 1, 1, bias=True)
@@ -73,7 +72,7 @@ class enhance_net_nopool_con(nn.Module):
         self.upsample = nn.UpsamplingBilinear2d(scale_factor=2)
 
     def forward(self, x):
-        low_con = F.sigmoid(self.con_conv2(self.con_conv1(x)))
+        low_con = F.sigmoid(self.con_conv1(x))
         x1 = self.relu(self.e_conv1(low_con))
         # p1 = self.maxpool(x1)
         x2 = self.relu(self.e_conv2(x1))
