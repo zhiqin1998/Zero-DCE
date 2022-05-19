@@ -43,6 +43,28 @@ class L_color(nn.Module):
         return k
 
 
+class L_color_ratio(nn.Module):
+
+    def __init__(self):
+        super(L_color_ratio, self).__init__()
+
+    def forward(self, x, ori):
+        b, c, h, w = x.shape
+
+        mean_rgb = torch.mean(x, [2, 3], keepdim=True)
+        mr, mg, mb = torch.split(mean_rgb, 1, dim=1)
+
+        ori_mean_rgb = torch.mean(ori, [2, 3], keepdim=True)
+        ori_mr, ori_mg, ori_mb = torch.split(ori_mean_rgb, 1, dim=1)
+        Drg = torch.pow((mr / mg) - (ori_mr / ori_mg), 2)
+        Drb = torch.pow((mr / mb) - (ori_mr / ori_mb), 2)
+        Dgb = torch.pow((mb / mg) - (ori_mb / ori_mg), 2)
+        # k = torch.pow(torch.pow(Drg, 2) + torch.pow(Drb, 2) + torch.pow(Dgb, 2), 0.5)
+        k = Drg + Drb + Dgb
+
+        return k
+
+
 class L_spa(nn.Module):
 
     def __init__(self, clip=1.):
@@ -88,6 +110,23 @@ class L_spa(nn.Module):
         D_org_up = F.conv2d(org_pool, self.weight_up, padding=1)
         D_org_down = F.conv2d(org_pool, self.weight_down, padding=1)
 
+        # scale = 0.1
+        # # use log to reduce spatial diff
+        # D_org_letf_s = torch.sign(D_org_letf)
+        # D_org_right_s = torch.sign(D_org_right)
+        # D_org_up_s = torch.sign(D_org_up)
+        # D_org_down_s = torch.sign(D_org_down)
+        #
+        # D_org_letf = D_org_letf_s * scale * torch.log10((9 * torch.abs(D_org_letf)) + 1)
+        # D_org_right = D_org_right_s * scale * torch.log10((9 * torch.abs(D_org_right)) + 1)
+        # D_org_up = D_org_up_s * scale * torch.log10((9 * torch.abs(D_org_up)) + 1)
+        # D_org_down = D_org_down_s * scale * torch.log10((9 * torch.abs(D_org_down)) + 1)
+        # use quad to reduce spatial diff
+        # D_org_letf = D_org_letf_s * scale * torch.pow(torch.abs(D_org_letf), 2)
+        # D_org_right = D_org_right_s * scale * torch.pow(torch.abs(D_org_right), 2)
+        # D_org_up = D_org_up_s * scale * torch.pow(torch.abs(D_org_up), 2)
+        # D_org_down = D_org_down_s * scale * torch.pow(torch.abs(D_org_down), 2)
+
         # clamp spatial diff
         # D_org_letf = torch.clamp(D_org_letf, self.clip[0], self.clip[1])
         # D_org_right = torch.clamp(D_org_right, self.clip[0], self.clip[1])
@@ -113,6 +152,80 @@ class L_spa(nn.Module):
 
         return E
 
+class L_spa_rgb(nn.Module):
+
+    def __init__(self, clip=1.):
+        super(L_spa_rgb, self).__init__()
+        # print(1)kernel = torch.FloatTensor(kernel).unsqueeze(0).unsqueeze(0)
+        kernel_left = torch.FloatTensor([[0, 0, 0], [-1, 1, 0], [0, 0, 0]]).cuda().unsqueeze(0).unsqueeze(0)
+        kernel_right = torch.FloatTensor([[0, 0, 0], [0, 1, -1], [0, 0, 0]]).cuda().unsqueeze(0).unsqueeze(0)
+        kernel_up = torch.FloatTensor([[0, -1, 0], [0, 1, 0], [0, 0, 0]]).cuda().unsqueeze(0).unsqueeze(0)
+        kernel_down = torch.FloatTensor([[0, 0, 0], [0, 1, 0], [0, -1, 0]]).cuda().unsqueeze(0).unsqueeze(0)
+        self.weight_left = nn.Parameter(data=kernel_left, requires_grad=False)
+        self.weight_right = nn.Parameter(data=kernel_right, requires_grad=False)
+        self.weight_up = nn.Parameter(data=kernel_up, requires_grad=False)
+        self.weight_down = nn.Parameter(data=kernel_down, requires_grad=False)
+        self.pool = nn.AvgPool2d(4)
+        self.clip = (-clip, clip)
+
+    def forward(self, org, enhance):
+        b, c, h, w = org.shape
+        ET = 0.
+
+        for i in range(c):
+
+            org_mean = org[:,i:i+1,:,:]
+            enhance_mean = enhance[:, i:i + 1, :, :]
+
+            org_pool = self.pool(org_mean)
+            enhance_pool = self.pool(enhance_mean)
+
+            D_org_letf = F.conv2d(org_pool, self.weight_left, padding=1)
+            D_org_right = F.conv2d(org_pool, self.weight_right, padding=1)
+            D_org_up = F.conv2d(org_pool, self.weight_up, padding=1)
+            D_org_down = F.conv2d(org_pool, self.weight_down, padding=1)
+
+            scale = 0.1
+            # use log to reduce spatial diff
+            D_org_letf_s = torch.sign(D_org_letf)
+            D_org_right_s = torch.sign(D_org_right)
+            D_org_up_s = torch.sign(D_org_up)
+            D_org_down_s = torch.sign(D_org_down)
+
+            D_org_letf = D_org_letf_s * scale * torch.log10((9 * torch.abs(D_org_letf)) + 1)
+            D_org_right = D_org_right_s * scale * torch.log10((9 * torch.abs(D_org_right)) + 1)
+            D_org_up = D_org_up_s * scale * torch.log10((9 * torch.abs(D_org_up)) + 1)
+            D_org_down = D_org_down_s * scale * torch.log10((9 * torch.abs(D_org_down)) + 1)
+            # use quad to reduce spatial diff
+            # D_org_letf = D_org_letf_s * scale * torch.pow(torch.abs(D_org_letf), 2)
+            # D_org_right = D_org_right_s * scale * torch.pow(torch.abs(D_org_right), 2)
+            # D_org_up = D_org_up_s * scale * torch.pow(torch.abs(D_org_up), 2)
+            # D_org_down = D_org_down_s * scale * torch.pow(torch.abs(D_org_down), 2)
+
+            # clamp spatial diff
+            # D_org_letf = torch.clamp(D_org_letf, self.clip[0], self.clip[1])
+            # D_org_right = torch.clamp(D_org_right, self.clip[0], self.clip[1])
+            # D_org_up = torch.clamp(D_org_up, self.clip[0], self.clip[1])
+            # D_org_down = torch.clamp(D_org_down, self.clip[0], self.clip[1])
+            # D_org_letf = D_org_letf / 2.
+            # D_org_right = D_org_right / 2.
+            # D_org_up = D_org_up / 2.
+            # D_org_down = D_org_down / 2.
+
+
+            D_enhance_letf = F.conv2d(enhance_pool, self.weight_left, padding=1)
+            D_enhance_right = F.conv2d(enhance_pool, self.weight_right, padding=1)
+            D_enhance_up = F.conv2d(enhance_pool, self.weight_up, padding=1)
+            D_enhance_down = F.conv2d(enhance_pool, self.weight_down, padding=1)
+
+            D_left = torch.pow(D_org_letf - D_enhance_letf, 2)
+            D_right = torch.pow(D_org_right - D_enhance_right, 2)
+            D_up = torch.pow(D_org_up - D_enhance_up, 2)
+            D_down = torch.pow(D_org_down - D_enhance_down, 2)
+            E = (D_left + D_right + D_up + D_down)
+            # E = 25*(D_left + D_right + D_up +D_down)
+            ET += E
+        return ET
 
 class L_exp(nn.Module):
 
@@ -141,14 +254,26 @@ class L_TV(nn.Module):
         super(L_TV, self).__init__()
         self.TVLoss_weight = TVLoss_weight
 
-    def forward(self, x):
+    def forward(self, x, img=None):
         batch_size = x.size()[0]
         h_x = x.size()[2]
         w_x = x.size()[3]
         count_h = (x.size()[2] - 1) * x.size()[3]
         count_w = x.size()[2] * (x.size()[3] - 1)
-        h_tv = torch.pow((x[:, :, 1:, :] - x[:, :, :h_x - 1, :]), 2).sum()
-        w_tv = torch.pow((x[:, :, :, 1:] - x[:, :, :, :w_x - 1]), 2).sum()
+        h_tv = torch.pow((x[:, :, 1:, :] - x[:, :, :h_x - 1, :]), 2)
+        w_tv = torch.pow((x[:, :, :, 1:] - x[:, :, :, :w_x - 1]), 2)
+        if img is not None:
+            ori_shape = h_tv.shape
+            ih_x = x.size()[2]
+            iw_x = x.size()[3]
+            gray = torch.mean(img, 1, keepdim=True)
+            ih_tv = torch.abs((gray[:, :, 1:, :] - gray[:, :, :ih_x - 1, :]))
+            iw_tv = torch.abs((gray[:, :, :, 1:] - gray[:, :, :, :iw_x - 1]))
+            h_tv = h_tv * (torch.max(ih_tv).item() - ih_tv)
+            w_tv = w_tv * (torch.max(iw_tv).item() - iw_tv)
+            assert h_tv.shape == ori_shape
+        h_tv = h_tv.sum()
+        w_tv = w_tv.sum()
         return self.TVLoss_weight * 2 * (h_tv / count_h + w_tv / count_w) / batch_size
 
 

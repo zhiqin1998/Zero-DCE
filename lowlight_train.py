@@ -26,7 +26,7 @@ def nanmean(v):
 def train(config):
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
-    DCE_net = model.enhance_net_nopool().cuda()
+    DCE_net = model.enhance_net_nopool_divin().cuda()
 
     DCE_net.apply(weights_init)
     if config.load_pretrain == True:
@@ -54,10 +54,11 @@ def train(config):
 
             enhanced_image_1, enhanced_image, A = DCE_net(img_lowlight)
 
+            # Loss_TV = 200 * L_TV(A, img_lowlight)
             Loss_TV = 200 * L_TV(A)
 
             loss_spa = torch.mean(L_spa(img_lowlight, enhanced_image))
-            loss_std = torch.mean(L_std(img_lowlight, enhanced_image))
+            # loss_std = torch.mean(L_std(img_lowlight, enhanced_image))
 
             loss_col = 5 * torch.mean(L_color(enhanced_image))
             # loss_col = 5 * nanmean(L_color(enhanced_image))
@@ -68,7 +69,7 @@ def train(config):
             loss_exp = 10 * torch.mean(L_exp(enhanced_image))
 
             # best_loss
-            loss = Loss_TV + loss_spa + loss_col + loss_exp + loss_std
+            loss = Loss_TV + loss_spa + loss_col + loss_exp
             # loss = Loss_TV + loss_col + loss_exp
 
             optimizer.zero_grad()
