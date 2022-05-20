@@ -69,7 +69,7 @@ class enhance_net_nopool_divin(nn.Module):
 
         self.maxpool = nn.MaxPool2d(2, stride=2, return_indices=False, ceil_mode=False)
         self.upsample = nn.UpsamplingBilinear2d(scale_factor=2)
-        self.divin = 0.8
+        self.divin = 0.9
 
     def forward(self, x):
         x1 = self.relu(self.e_conv1(x))
