@@ -26,7 +26,7 @@ def nanmean(v):
 def train(config):
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
-    DCE_net = model.enhance_net_nopool_divin().cuda()
+    DCE_net = model.enhance_net_nopool_ldivin().cuda()
 
     DCE_net.apply(weights_init)
     if config.load_pretrain == True:
