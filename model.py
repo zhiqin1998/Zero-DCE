@@ -117,13 +117,13 @@ class enhance_net_nopool_ldivin(nn.Module):
 
         self.maxpool = nn.MaxPool2d(2, stride=2, return_indices=False, ceil_mode=False)
         self.upsample = nn.UpsamplingBilinear2d(scale_factor=2)
-        self.divin_pool = nn.MaxPool2d(2, 2)
+        self.divin_pool = nn.AdaptiveMaxPool2d(64)
         self.divin_conv = nn.Conv2d(3, 4, 3, 2, 1)
-        self.divin_pool2 = nn.MaxPool2d(2, 2)
+        self.divin_pool2 = nn.AdaptiveMaxPool2d(16)
         self.divin_conv2 = nn.Conv2d(4, 8, 3, 2, 1)
-        self.divin_pool3 = nn.MaxPool2d(2, 2)
+        self.divin_pool3 = nn.AdaptiveMaxPool2d(4)
         self.divin_conv3 = nn.Conv2d(8, 16, 3, 2, 1)
-        self.divin_fc = nn.Linear(16 * 256 // 64 * 256 // 64, 1)
+        self.divin_fc = nn.Linear(16 * 4 * 4, 1)
 
     def forward(self, x):
         x1 = self.relu(self.e_conv1(x))
