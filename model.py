@@ -126,6 +126,9 @@ class enhance_net_nopool_ldivin(nn.Module):
         self.divin_conv3 = nn.Conv2d(8, 16, 3, 2, 1)
         self.divin_fc = nn.Linear(16 * 4 * 4, 1)
 
+    def set_return_divin(self, return_divin):
+        self.return_divin = return_divin
+
     def forward(self, x):
         x1 = self.relu(self.e_conv1(x))
         # p1 = self.maxpool(x1)
