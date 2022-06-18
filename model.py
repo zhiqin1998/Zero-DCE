@@ -105,6 +105,7 @@ class enhance_net_nopool_ldivin(nn.Module):
         super(enhance_net_nopool_ldivin, self).__init__()
 
         self.relu = nn.ReLU(inplace=True)
+        self.return_divin = False
 
         number_f = 32
         self.e_conv1 = nn.Conv2d(3, number_f, 3, 1, 1, bias=True)
@@ -159,7 +160,10 @@ class enhance_net_nopool_ldivin(nn.Module):
         x = x + r7 * (torch.pow(x, 2) - x)
         enhance_image = x + r8 * (torch.pow(x, 2) - x)
         r = torch.cat([r1, r2, r3, r4, r5, r6, r7, r8], 1)
-        return enhance_image_1, enhance_image, r
+        if self.return_divin:
+            return enhance_image_1, enhance_image, r, divin
+        else:
+            return enhance_image_1, enhance_image, r
 
 class enhance_net_nopool_divx(nn.Module):
 
