@@ -215,7 +215,7 @@ class enhance_net_nopool_lmapdivin(nn.Module):
         divin = self.divin_conv2(divin)  # conv
         divin = self.divin_conv3(divin)  # conv
         divin = self.divin_conv4(divin)  # conv
-        divin = torch.sigmoid(divin) * 0.1 + 0.9  # limit to 0.9-1.0
+        divin = torch.sigmoid(divin)# * 0.1 + 0.9  # limit to 0.9-1.0
 
         x = x * divin
         x = x + r1 * (torch.pow(x, 2) - x)
