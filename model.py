@@ -51,6 +51,108 @@ class enhance_net_nopool(nn.Module):
         r = torch.cat([r1, r2, r3, r4, r5, r6, r7, r8], 1)
         return enhance_image_1, enhance_image, r
 
+class enhance_net_nopool_shiftrgb(nn.Module):
+
+    def __init__(self):
+        super(enhance_net_nopool_shiftrgb, self).__init__()
+
+        self.relu = nn.ReLU(inplace=True)
+
+        number_f = 32
+        self.e_conv1 = nn.Conv2d(3, number_f, 3, 1, 1, bias=True)
+        self.e_conv2 = nn.Conv2d(number_f, number_f, 3, 1, 1, bias=True)
+        self.e_conv3 = nn.Conv2d(number_f, number_f, 3, 1, 1, bias=True)
+        self.e_conv4 = nn.Conv2d(number_f, number_f, 3, 1, 1, bias=True)
+        self.e_conv5 = nn.Conv2d(number_f * 2, number_f, 3, 1, 1, bias=True)
+        self.e_conv6 = nn.Conv2d(number_f * 2, number_f, 3, 1, 1, bias=True)
+        self.e_conv7 = nn.Conv2d(number_f * 2, 48, 3, 1, 1, bias=True)
+
+        self.maxpool = nn.MaxPool2d(2, stride=2, return_indices=False, ceil_mode=False)
+        self.upsample = nn.UpsamplingBilinear2d(scale_factor=2)
+
+    def forward(self, x):
+        x1 = self.relu(self.e_conv1(x))
+        # p1 = self.maxpool(x1)
+        x2 = self.relu(self.e_conv2(x1))
+        # p2 = self.maxpool(x2)
+        x3 = self.relu(self.e_conv3(x2))
+        # p3 = self.maxpool(x3)
+        x4 = self.relu(self.e_conv4(x3))
+
+        x5 = self.relu(self.e_conv5(torch.cat([x3, x4], 1)))
+        # x5 = self.upsample(x5)
+        x6 = self.relu(self.e_conv6(torch.cat([x2, x5], 1)))
+
+        x7 = self.e_conv7(torch.cat([x1, x6], 1))
+        x_r, x_b = torch.split(x7, 24, dim=1)
+        x_r = F.tanh(x_r)
+        x_b = F.sigmoid(x_b)
+        r1, r2, r3, r4, r5, r6, r7, r8 = torch.split(x_r, 3, dim=1)
+        b1, b2, b3, b4, b5, b6, b7, b8 = torch.split(x_b, 3, dim=1)
+
+        x = self.relu(x - b1) + r1 * (torch.pow(x, 2) - x)
+        x = self.relu(x - b2) + r2 * (torch.pow(x, 2) - x)
+        x = self.relu(x - b3) + r3 * (torch.pow(x, 2) - x)
+        enhance_image_1 = self.relu(x - b4) + r4 * (torch.pow(x, 2) - x)
+        x = self.relu(enhance_image_1 - b5) + r5 * (torch.pow(enhance_image_1, 2) - enhance_image_1)
+        x = self.relu(x - b6) + r6 * (torch.pow(x, 2) - x)
+        x = self.relu(x - b7) + r7 * (torch.pow(x, 2) - x)
+        enhance_image = self.relu(x - b8) + r8 * (torch.pow(x, 2) - x)
+        r = torch.cat([r1, r2, r3, r4, r5, r6, r7, r8], 1)
+        b = torch.cat([b1, b2, b3, b4, b5, b6, b7, b8], 1)
+        return enhance_image_1, enhance_image, r, b
+
+class enhance_net_nopool_shiftmean(nn.Module):
+
+    def __init__(self):
+        super(enhance_net_nopool_shiftmean, self).__init__()
+
+        self.relu = nn.ReLU(inplace=True)
+
+        number_f = 32
+        self.e_conv1 = nn.Conv2d(3, number_f, 3, 1, 1, bias=True)
+        self.e_conv2 = nn.Conv2d(number_f, number_f, 3, 1, 1, bias=True)
+        self.e_conv3 = nn.Conv2d(number_f, number_f, 3, 1, 1, bias=True)
+        self.e_conv4 = nn.Conv2d(number_f, number_f, 3, 1, 1, bias=True)
+        self.e_conv5 = nn.Conv2d(number_f * 2, number_f, 3, 1, 1, bias=True)
+        self.e_conv6 = nn.Conv2d(number_f * 2, number_f, 3, 1, 1, bias=True)
+        self.e_conv7 = nn.Conv2d(number_f * 2, 24+8, 3, 1, 1, bias=True)
+
+        self.maxpool = nn.MaxPool2d(2, stride=2, return_indices=False, ceil_mode=False)
+        self.upsample = nn.UpsamplingBilinear2d(scale_factor=2)
+
+    def forward(self, x):
+        x1 = self.relu(self.e_conv1(x))
+        # p1 = self.maxpool(x1)
+        x2 = self.relu(self.e_conv2(x1))
+        # p2 = self.maxpool(x2)
+        x3 = self.relu(self.e_conv3(x2))
+        # p3 = self.maxpool(x3)
+        x4 = self.relu(self.e_conv4(x3))
+
+        x5 = self.relu(self.e_conv5(torch.cat([x3, x4], 1)))
+        # x5 = self.upsample(x5)
+        x6 = self.relu(self.e_conv6(torch.cat([x2, x5], 1)))
+
+        x7 = self.e_conv7(torch.cat([x1, x6], 1))
+        x_r, x_b = torch.split(x7, [24, 8], dim=1)
+        x_r = F.tanh(x_r)
+        x_b = F.sigmoid(x_b)
+        r1, r2, r3, r4, r5, r6, r7, r8 = torch.split(x_r, 3, dim=1)
+        b1, b2, b3, b4, b5, b6, b7, b8 = torch.split(x_b, 1, dim=1)
+
+        x = self.relu(x - b1) + r1 * (torch.pow(x, 2) - x)
+        x = self.relu(x - b2) + r2 * (torch.pow(x, 2) - x)
+        x = self.relu(x - b3) + r3 * (torch.pow(x, 2) - x)
+        enhance_image_1 = self.relu(x - b4) + r4 * (torch.pow(x, 2) - x)
+        x = self.relu(enhance_image_1 - b5) + r5 * (torch.pow(enhance_image_1, 2) - enhance_image_1)
+        x = self.relu(x - b6) + r6 * (torch.pow(x, 2) - x)
+        x = self.relu(x - b7) + r7 * (torch.pow(x, 2) - x)
+        enhance_image = self.relu(x - b8) + r8 * (torch.pow(x, 2) - x)
+        r = torch.cat([r1, r2, r3, r4, r5, r6, r7, r8], 1)
+        b = torch.cat([b1, b2, b3, b4, b5, b6, b7, b8], 1)
+        return enhance_image_1, enhance_image, r, b
+
 class enhance_net_nopool_divin(nn.Module):
 
     def __init__(self):

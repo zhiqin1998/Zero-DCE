@@ -36,9 +36,9 @@ class L_color(nn.Module):
         Drg = torch.pow(mr - mg, 2)
         Drb = torch.pow(mr - mb, 2)
         Dgb = torch.pow(mb - mg, 2)
-        k = torch.pow(torch.pow(Drg, 2) + torch.pow(Drb, 2) + torch.pow(Dgb, 2), 0.5)
+        # k = torch.pow(torch.pow(Drg, 2) + torch.pow(Drb, 2) + torch.pow(Dgb, 2), 0.5)
         # avoid sqrt 0
-        # k = Drg + Drb + Dgb
+        k = Drg + Drb + Dgb
 
         return k
 
@@ -110,7 +110,7 @@ class L_spa(nn.Module):
         D_org_up = F.conv2d(org_pool, self.weight_up, padding=1)
         D_org_down = F.conv2d(org_pool, self.weight_down, padding=1)
 
-        # scale = 0.1
+        # scale = 0.05
         # # use log to reduce spatial diff
         # D_org_letf_s = torch.sign(D_org_letf)
         # D_org_right_s = torch.sign(D_org_right)
@@ -332,3 +332,91 @@ class perception_loss(nn.Module):
         h_relu_4_3 = h
         # out = (h_relu_1_2, h_relu_2_2, h_relu_3_3, h_relu_4_3)
         return h_relu_4_3
+
+def proximity_loss(real_images, fake_images, p1=10.0, p2=1.0, reduction='mean'):
+    """
+        calcualtes proximity loss in c3lt.
+    :param real_images:
+    :param fake_images:
+    :param p1:
+    :param p2:
+    :param reduction:
+    :return:
+    """
+    # convert to gray
+    real_images = torch.mean(real_images, 1, keepdim=True)
+    fake_images = torch.mean(fake_images, 1, keepdim=True)
+
+    masks = gen_masks(real_images, fake_images, mode='mse')
+    L1 = nn.L1Loss(reduction=reduction)
+    smooth = smoothness_loss(masks, reduction=reduction)
+    entropy = entropy_loss(masks, reduction=reduction)
+    prx = L1(real_images, fake_images)
+    return (prx + p1 * smooth + p2 * entropy) / (1 + p1 + p2)
+
+def smoothness_loss(masks, beta=2, reduction="mean"):
+    """
+        smoothness loss that encourages smooth masks.
+    :param masks:
+    :param beta:
+    :param reduction:
+    :return:
+    """
+    # TODO RGB images
+    masks = masks[:, 0, :, :]
+    a = torch.mean(torch.abs((masks[:, :-1, :] - masks[:, 1:, :]).view(masks.shape[0], -1)).pow(beta), dim=1)
+    b = torch.mean(torch.abs((masks[:, :, :-1] - masks[:, :, 1:]).view(masks.shape[0], -1)).pow(beta), dim=1)
+    if reduction == "mean":
+        return (a + b).mean() / 2
+    else:
+        return (a + b).sum() / 2
+
+
+def entropy_loss(masks, reduction="mean"):
+    """
+        entropy loss that encourages binary masks.
+    :param masks:
+    :param reduction:
+    :return:
+    """
+    # TODO RGB images
+    masks = masks[:, 0, :, :]
+    b, h, w = masks.shape
+    if reduction == "mean":
+        return torch.minimum(masks.view(b, -1), 1.0 - masks.view(b, -1)).mean()
+    else:
+        return torch.minimum(masks.view(b, -1), 1.0 - masks.view(b, -1)).sum()
+
+def gen_masks(inputs, targets, mode='abs'):
+    """
+        generates a difference masks give two images (inputs and targets).
+    :param inputs:
+    :param targets:
+    :param mode:
+    :return:
+    """
+    # TODO RGB images
+    masks = targets - inputs
+    masks = masks.view(inputs.size(0), -1)
+
+    if mode == 'abs':
+        masks = masks.abs()
+        # normalize 0 to 1
+        masks -= masks.min(1, keepdim=True)[0]
+        masks /= masks.max(1, keepdim=True)[0]
+
+    elif mode == "mse":
+        masks = masks ** 2
+        masks -= masks.min(1, keepdim=True)[0]
+        masks /= masks.max(1, keepdim=True)[0]
+
+    elif mode == 'normal':
+        # normalize -1 to 1
+        min_m = masks.min(1, keepdim=True)[0]
+        max_m = masks.max(1, keepdim=True)[0]
+        masks = 2 * (masks - min_m) / (max_m - min_m) - 1
+
+    else:
+        raise ValueError("mode value is not valid!")
+
+    return masks.view(inputs.shape)
