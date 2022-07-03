@@ -8,6 +8,9 @@ import Myloss
 import dataloader
 import model
 
+from PIL import Image
+import cv2
+import numpy as np
 
 def weights_init(m):
     classname = m.__class__.__name__
@@ -26,7 +29,7 @@ def nanmean(v):
 def train(config):
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
-    DCE_net = model.enhance_net_nopool_ldivin().cuda()
+    DCE_net = model.enhance_net_nopool_shiftrgb().cuda()
 
     DCE_net.apply(weights_init)
     if config.load_pretrain == True:
@@ -39,7 +42,8 @@ def train(config):
     L_color = Myloss.L_color()
     L_spa = Myloss.L_spa(clip=0.01)
     L_std = Myloss.L_std()
-
+    L1 = torch.nn.L1Loss()
+    L_prox = Myloss.proximity_loss
     L_exp = Myloss.L_exp(16, config.exposure)
     L_TV = Myloss.L_TV()
 
@@ -52,10 +56,11 @@ def train(config):
 
             img_lowlight = img_lowlight.cuda()
 
-            enhanced_image_1, enhanced_image, A = DCE_net(img_lowlight)
+            enhanced_image_1, enhanced_image, A, B = DCE_net(img_lowlight)
 
             # Loss_TV = 200 * L_TV(A, img_lowlight)
             Loss_TV = 200 * L_TV(A)
+            Loss_TV_B = 200 * L_TV(B) + L1(B, torch.zeros_like(B))
 
             loss_spa = torch.mean(L_spa(img_lowlight, enhanced_image))
             # loss_std = torch.mean(L_std(img_lowlight, enhanced_image))
@@ -69,7 +74,8 @@ def train(config):
             loss_exp = 10 * torch.mean(L_exp(enhanced_image))
 
             # best_loss
-            loss = Loss_TV + loss_spa + loss_col + loss_exp
+            print(Loss_TV.item(), loss_spa.item(), loss_col.item(), loss_exp.item())
+            loss = Loss_TV + Loss_TV_B + loss_spa + loss_col + loss_exp
             # loss = Loss_TV + loss_col + loss_exp
 
             optimizer.zero_grad()
@@ -80,6 +86,50 @@ def train(config):
             if ((iteration + 1) % config.display_iter) == 0:
                 print("Loss at iteration", iteration + 1, ":", loss.item())
         torch.save(DCE_net.state_dict(), config.snapshots_folder + "Epoch" + str(epoch) + '.pth')
+
+    if True:
+        # remove all weight except last epoch
+        for x in os.listdir(config.snapshots_folder):
+            if str(epoch) not in x:
+                os.remove(os.path.join(config.snapshots_folder, x))
+
+        # generate test image
+        save_dir = os.path.join(config.snapshots_folder, 'test')
+        os.makedirs(save_dir, exist_ok=True)
+        for file in os.listdir('data/test_data/ICDAR'):
+            img_path = os.path.join('data/test_data/ICDAR', file)
+            gt_img = Image.open(img_path)
+            gt_img = (np.asarray(gt_img) / 255.0)
+            input_img = torch.from_numpy(gt_img).float()
+            input_img = input_img.permute(2, 0, 1)
+            input_img = input_img.cuda().unsqueeze(0)
+            with torch.no_grad():
+                outputs = DCE_net(input_img)
+                enhanced_image = outputs[1]
+                enhanced_image = enhanced_image.cpu().squeeze().permute(1, 2, 0).detach().numpy()
+            lowlight = Image.fromarray(np.uint8(enhanced_image * 255))
+            he_rgb = Image.fromarray(np.uint8(hist_rgb(enhanced_image.copy()) * 255))
+            ls_rgb = Image.fromarray(np.uint8(linear_scale_rgb(enhanced_image.copy()) * 255))
+            lowlight.save(os.path.join(save_dir, file[:-4] + '_low.jpg'))
+            he_rgb.save(os.path.join(save_dir, file[:-4] + '_he.jpg'))
+            ls_rgb.save(os.path.join(save_dir, file[:-4] + '_ls.jpg'))
+
+
+def hist_rgb(img):
+    img = (img * 255).astype(np.uint8)
+    # equalize histogram of each channel
+    img[:,:,0] = cv2.equalizeHist(img[:,:,0])
+    img[:,:,1] = cv2.equalizeHist(img[:,:,1])
+    img[:,:,2] = cv2.equalizeHist(img[:,:,2])
+    return img / 255.
+
+def linear_scale_rgb(img):
+    # linear scale of each channel
+    img = (img * 255).astype(np.uint8).astype(np.float32)
+    img[:,:,0] = (img[:,:,0] - img[:,:,0].min()) / (img[:,:,0].max() - img[:,:,0].min())
+    img[:,:,1] = (img[:,:,1] - img[:,:,1].min()) / (img[:,:,1].max() - img[:,:,1].min())
+    img[:,:,2] = (img[:,:,2] - img[:,:,2].min()) / (img[:,:,2].max() - img[:,:,2].min())
+    return img
 
 
 if __name__ == "__main__":
