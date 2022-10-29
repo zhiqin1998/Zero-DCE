@@ -873,3 +873,84 @@ class enhance_net_nopool_n16(nn.Module):
         enhance_image = x + r16 * (torch.pow(x, 2) - x)
         r = torch.cat([r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16], 1)
         return enhance_image_1, enhance_image, r
+
+class Double_Conv2d(nn.Module):
+    def __init__(self, in_channel, out_channel):
+        super(Double_Conv2d, self).__init__()
+        self.double_conv2d = torch.nn.Sequential(
+            nn.Conv2d(
+                in_channels=in_channel,
+                out_channels=out_channel,
+                kernel_size=3,
+                padding=1), nn.LeakyReLU(0.2),
+            nn.Conv2d(
+                in_channels=out_channel,
+                out_channels=out_channel,
+                kernel_size=3,
+                padding=1), nn.LeakyReLU(0.2))
+
+    def forward(self, x):
+        return self.double_conv2d(x)
+
+class UNet(nn.Module):
+    def __init__(self):
+        super(UNet, self).__init__()
+        self.conv1 = Double_Conv2d(3, 32)
+        self.conv2 = Double_Conv2d(32, 64)
+        self.conv3 = Double_Conv2d(64, 128)
+        self.conv4 = Double_Conv2d(128, 256)
+        self.conv5 = Double_Conv2d(256, 512)
+        self.up6 = nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2)
+        self.conv6 = Double_Conv2d(512, 256)
+        self.up7 = nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2)
+        self.conv7 = Double_Conv2d(256, 128)
+        self.up8 = nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
+        self.conv8 = Double_Conv2d(128, 64)
+        self.up9 = nn.ConvTranspose2d(64, 32, kernel_size=2, stride=2)
+        self.conv9 = Double_Conv2d(64, 32)
+        self.conv10 = nn.Conv2d(in_channels=32, out_channels=6, kernel_size=1)
+
+    def forward(self, x):
+        conv1 = self.conv1(x)
+        pool1 = F.max_pool2d(conv1, kernel_size=2)
+
+        conv2 = self.conv2(pool1)
+        pool2 = F.max_pool2d(conv2, kernel_size=2)
+
+        conv3 = self.conv3(pool2)
+        pool3 = F.max_pool2d(conv3, kernel_size=2)
+
+        conv4 = self.conv4(pool3)
+        pool4 = F.max_pool2d(conv4, kernel_size=2)
+
+        conv5 = self.conv5(pool4)
+
+        up6 = self.up6(conv5)
+        up6 = torch.cat([up6, conv4], 1)
+        conv6 = self.conv6(up6)
+
+        up7 = self.up7(conv6)
+        up7 = torch.cat([up7, conv3], 1)
+        conv7 = self.conv7(up7)
+
+        up8 = self.up8(conv7)
+        up8 = torch.cat([up8, conv2], 1)
+        conv8 = self.conv8(up8)
+
+        up9 = self.up9(conv8)
+        up9 = torch.cat([up9, conv1], 1)
+        conv9 = self.conv9(up9)
+
+        conv10 = self.conv10(conv9)
+        # out = F.pixel_shuffle(conv10, 1)
+
+        x_r, x_b = torch.split(conv10, [3, 3], dim=1)
+        x_r = F.tanh(x_r)
+        x_b = F.relu(x_b)
+
+        x = - (x_r + x_b) * torch.pow(x, 2) + (1 + x_r) * x
+        enhance_image = x
+        enhance_image_1 = x
+        r = x_r
+        return enhance_image_1, enhance_image, r, x_b
+

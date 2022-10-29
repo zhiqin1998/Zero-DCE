@@ -110,17 +110,17 @@ class L_spa(nn.Module):
         D_org_up = F.conv2d(org_pool, self.weight_up, padding=1)
         D_org_down = F.conv2d(org_pool, self.weight_down, padding=1)
 
-        # scale = 0.05
-        # # use log to reduce spatial diff
-        # D_org_letf_s = torch.sign(D_org_letf)
-        # D_org_right_s = torch.sign(D_org_right)
-        # D_org_up_s = torch.sign(D_org_up)
-        # D_org_down_s = torch.sign(D_org_down)
-        #
-        # D_org_letf = D_org_letf_s * scale * torch.log10((9 * torch.abs(D_org_letf)) + 1)
-        # D_org_right = D_org_right_s * scale * torch.log10((9 * torch.abs(D_org_right)) + 1)
-        # D_org_up = D_org_up_s * scale * torch.log10((9 * torch.abs(D_org_up)) + 1)
-        # D_org_down = D_org_down_s * scale * torch.log10((9 * torch.abs(D_org_down)) + 1)
+        scale = 0.05
+        # use log to reduce spatial diff
+        D_org_letf_s = torch.sign(D_org_letf)
+        D_org_right_s = torch.sign(D_org_right)
+        D_org_up_s = torch.sign(D_org_up)
+        D_org_down_s = torch.sign(D_org_down)
+
+        D_org_letf = D_org_letf_s * scale * torch.log10((9 * torch.abs(D_org_letf)) + 1)
+        D_org_right = D_org_right_s * scale * torch.log10((9 * torch.abs(D_org_right)) + 1)
+        D_org_up = D_org_up_s * scale * torch.log10((9 * torch.abs(D_org_up)) + 1)
+        D_org_down = D_org_down_s * scale * torch.log10((9 * torch.abs(D_org_down)) + 1)
         # use quad to reduce spatial diff
         # D_org_letf = D_org_letf_s * scale * torch.pow(torch.abs(D_org_letf), 2)
         # D_org_right = D_org_right_s * scale * torch.pow(torch.abs(D_org_right), 2)
